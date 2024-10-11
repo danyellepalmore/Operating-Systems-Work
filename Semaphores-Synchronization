@@ -1,0 +1,93 @@
+/******************************************************************************
+    Danyelle Palmore
+    11 Oct 2024
+    COMP 350
+    This program uses semaphores to coordinate access to a shared buffer to 
+    avoid race conditions, deadlock, or crashes. It accomplishes control access to a 
+    common resource by multiple processes.
+
+*******************************************************************************/
+#include <iostream>
+#include <thread>
+#include <mutex>                //prevent race conditions
+#include <condition_variable>   //signal when buffer is full/empty
+#include <queue>                //simulates shared buffer
+#include <vector>
+
+using namespace std;
+
+// Shared buffer
+queue<int> buffer;
+mutex mtx;//protect access to shared buffer
+condition_variable buffer_not_empty; //wait until buffer has items
+const int MAX_ITEMS = 10; //producing and consuming 10 items
+int item_count = 0;  // Tracks the total items produced
+
+// Producer function
+void producer(int id, int num_items) { //unique id of producer and num of items to produce
+    for (int i = 0; i < num_items; i++) {
+        unique_lock<mutex> lock(mtx); //one thread at a time can access shared buffer
+        
+        item_count++;// Produce an item 
+        buffer.push(item_count); //item added to buffer
+        
+        cout << "Producer " << id << " produced item " << item_count << endl;
+
+        // Notify a consumer that there is something in the buffer
+        buffer_not_empty.notify_one(); 
+    }
+}
+
+// Consumer function
+void consumer(int id, int num_items) {
+    for (int i = 0; i < num_items; i++) {
+        unique_lock<mutex> lock(mtx);
+
+        // Wait until the buffer is not empty
+        buffer_not_empty.wait(lock, []{ return !buffer.empty(); });
+
+        // Consume an item (retrieve and remove it from the buffer)
+        int item = buffer.front();
+        buffer.pop();
+
+        cout << "Consumer " << id << " consumed item " << item << endl;
+
+        // Optionally: notify the producer that there is space in the buffer
+    }
+}
+
+int main(int argc, char *argv[]) {
+    if (argc != 3) {
+        cerr << "Usage: " << argv[0] << " <num_producers> <num_consumers>" << endl;
+        return 1;
+    }
+
+    // Parse command-line arguments
+    int num_producers = stoi(argv[1]);
+    int num_consumers = stoi(argv[2]);
+
+    // Create producer and consumer threads
+    vector<thread> producers, consumers;
+
+    // Each producer and consumer will handle `MAX_ITEMS / num_producers` or `MAX_ITEMS / num_consumers` items
+    for (int i = 0; i < num_producers; i++) {
+        producers.emplace_back(producer, i + 1, MAX_ITEMS / num_producers);
+    }
+    for (int i = 0; i < num_consumers; i++) {
+        consumers.emplace_back(consumer, i + 1, MAX_ITEMS / num_consumers);
+    }
+
+    // Join all producer threads
+    for (auto &p : producers) {
+        p.join();
+    }
+
+    // Join all consumer threads
+    for (auto &c : consumers) {
+        c.join();
+    }
+
+    cout << "All items produced and consumed successfully." << endl;
+
+    return 0;
+}
