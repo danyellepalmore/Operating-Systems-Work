@@ -42,27 +42,23 @@ void producer(int id, int num_items) { //unique id of producer and num of items 
 void consumer(int id, int num_items) {
     for (int i = 0; i < num_items; i++) {
         unique_lock<mutex> lock(mtx);
-
         // Wait until the buffer is not empty
         buffer_not_empty.wait(lock, []{ return !buffer.empty(); });
-
-        // Consume an item (retrieve and remove it from the buffer)
+        // Consume an item (retrieve)
         int item = buffer.front();
-        buffer.pop();
-
+        buffer.pop(); //remove item from buffer
         cout << "Consumer " << id << " consumed item " << item << endl;
-
-        // Optionally: notify the producer that there is space in the buffer
     }
 }
 
 int main(int argc, char *argv[]) {
+    //error handling
     if (argc != 3) {
         cerr << "Usage: " << argv[0] << " <num_producers> <num_consumers>" << endl;
         return 1;
     }
 
-    // Parse command-line arguments
+    // Parse command-line arguments (strings to integers)
     int num_producers = stoi(argv[1]);
     int num_consumers = stoi(argv[2]);
 
